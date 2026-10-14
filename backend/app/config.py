@@ -6,9 +6,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres:postgres@localhost:5433/cash_flow",
+
+def _sqlalchemy_url(url: str) -> str:
+    """Accept plain postgres:// URLs (as Supabase shows them) and use the psycopg 3 driver."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
+DATABASE_URL = _sqlalchemy_url(
+    os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5433/cash_flow")
 )
 APP_TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "Asia/Karachi"))
 CORS_ORIGINS = [
