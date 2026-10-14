@@ -35,6 +35,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new ApiError(detail || `Request failed (${res.status})`, res.status);
   }
 
+  // e.g. DELETE responses have no body
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -48,6 +50,10 @@ export type PersonBrief = {
 
 export type Person = PersonBrief & {
   created_at: string;
+};
+
+export type PersonSummary = Person & {
+  transaction_count: number;
 };
 
 export type Transaction = {

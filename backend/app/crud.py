@@ -30,12 +30,41 @@ def create_person(db: Session, data: schemas.PersonCreate) -> models.Person:
     return person
 
 
-def get_persons(db: Session) -> list[models.Person]:
-    return list(db.scalars(select(models.Person).order_by(models.Person.id)))
+def get_persons(db: Session) -> list[schemas.PersonSummary]:
+    count = func.count(Txn.id)
+    rows = db.execute(
+        select(models.Person, count)
+        .outerjoin(Txn, Txn.person_id == models.Person.id)
+        .group_by(models.Person.id)
+        .order_by(models.Person.id)
+    )
+    return [_person_summary(person, n) for person, n in rows]
 
 
 def get_person(db: Session, person_id: int) -> models.Person | None:
     return db.get(models.Person, person_id)
+
+
+def count_person_transactions(db: Session, person_id: int) -> int:
+    return db.scalar(select(func.count()).select_from(Txn).where(Txn.person_id == person_id)) or 0
+
+
+def _person_summary(person: models.Person, transaction_count: int) -> schemas.PersonSummary:
+    return schemas.PersonSummary(
+        **schemas.PersonRead.model_validate(person).model_dump(), transaction_count=transaction_count
+    )
+
+
+def update_person(db: Session, person: models.Person, data: schemas.PersonUpdate) -> schemas.PersonSummary:
+    person.name = data.name
+    db.commit()
+    db.refresh(person)
+    return _person_summary(person, count_person_transactions(db, person.id))
+
+
+def delete_person(db: Session, person: models.Person) -> None:
+    db.delete(person)
+    db.commit()
 
 
 # ---------- Transactions ----------

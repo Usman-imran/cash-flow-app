@@ -28,8 +28,16 @@ class PersonBrief(ORMModel):
     name: str
 
 
+class PersonUpdate(PersonCreate):
+    pass
+
+
 class PersonRead(PersonBrief):
     created_at: datetime
+
+
+class PersonSummary(PersonRead):
+    transaction_count: int = 0
 
 
 # ---------- Transactions ----------

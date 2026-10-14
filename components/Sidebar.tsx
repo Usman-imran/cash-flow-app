@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Menu,
   PlusCircle,
+  Users,
   Wallet,
   X,
   type LucideIcon,
@@ -24,6 +25,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cash-entry", label: "Cash Entry", icon: PlusCircle },
+  { href: "/salesmen", label: "Salesmen", icon: Users },
   { href: "/daily-log", label: "Daily Log", icon: History },
   { href: "/denomination", label: "Denomination", icon: Banknote },
   { href: "/reports", label: "Reports", icon: BarChart3 },
