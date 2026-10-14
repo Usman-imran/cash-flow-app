@@ -6,6 +6,7 @@ import { AlertCircle, CalendarClock, Clock, Eraser, History, Save, UserPlus } fr
 import Spinner from "@/components/Spinner";
 import { useToast } from "@/components/Toast";
 import AddSalesmanModal from "@/components/cash-entry/AddSalesmanModal";
+import SalesmanSearch from "@/components/cash-entry/SalesmanSearch";
 import NoteCountTable, {
   emptyCounts,
   isEmpty,
@@ -53,7 +54,7 @@ export default function CashEntryForm() {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
-  const selectRef = useRef<HTMLSelectElement>(null);
+  const personInputRef = useRef<HTMLInputElement>(null);
 
   const loadPersons = useCallback((signal?: AbortSignal) => {
     apiFetch<Person[]>("/api/persons", { signal })
@@ -115,7 +116,7 @@ export default function CashEntryForm() {
     setUseCustomTime(false);
     setCustomTime("");
     setErrors({});
-    selectRef.current?.focus();
+    personInputRef.current?.focus();
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -199,38 +200,23 @@ export default function CashEntryForm() {
               </button>
             </div>
           ) : (
-            <div className="relative mt-1.5">
-              <select
+            <div className="mt-1.5">
+              <SalesmanSearch
                 id="person"
-                ref={selectRef}
+                inputRef={personInputRef}
+                persons={persons}
                 value={personId}
-                onChange={(e) => {
-                  setPersonId(e.target.value);
+                onChange={(id) => {
+                  setPersonId(id);
                   setErrors((er) => ({ ...er, person: undefined }));
                 }}
-                disabled={personsLoading || submitting}
-                aria-invalid={!!errors.person}
-                aria-describedby={errors.person ? "person-error" : undefined}
-                className={`${inputBase} ${errors.person ? inputErr : inputOk} ${personsLoading ? "pr-10" : ""}`}
-              >
-                <option value="">
-                  {personsLoading
-                    ? "Loading salesmen…"
-                    : persons.length === 0
-                      ? "No salesmen yet — add one first"
-                      : "Select a salesman"}
-                </option>
-                {persons.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {personLabel(p)}
-                  </option>
-                ))}
-              </select>
-              {personsLoading && (
-                <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center">
-                  <Spinner className="h-4 w-4 text-slate-400" />
-                </span>
-              )}
+                label={personLabel}
+                loading={personsLoading}
+                disabled={submitting}
+                invalid={!!errors.person}
+                describedBy={errors.person ? "person-error" : undefined}
+                className={`${inputBase} ${errors.person ? inputErr : inputOk}`}
+              />
             </div>
           )}
           {errors.person && (
