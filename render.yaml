@@ -4,6 +4,8 @@ services:
     name: cash-flow-api
     runtime: python
     plan: free
+    # Closest Render region to the Supabase project (ap-southeast-2, Sydney)
+    region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
