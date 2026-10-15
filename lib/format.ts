@@ -1,3 +1,5 @@
+import { DENOMINATIONS, type NoteCounts } from "@/lib/api";
+
 const currencyFormatter = new Intl.NumberFormat("en-PK", {
   style: "currency",
   currency: "PKR",
@@ -55,4 +57,11 @@ const shortDateFormatter = new Intl.DateTimeFormat("en-PK", {
 export function formatShortDate(isoDate: string) {
   const [y, m, d] = isoDate.split("-").map(Number);
   return shortDateFormatter.format(new Date(y, m - 1, d));
+}
+
+/** e.g. "2×5000 · 3×100 · coins 7" */
+export function noteBreakdown(counts: NoteCounts) {
+  const parts = DENOMINATIONS.filter((d) => counts[`note_${d}`] > 0).map((d) => `${counts[`note_${d}`]}×${d}`);
+  if (counts.coins > 0) parts.push(`coins ${counts.coins}`);
+  return parts.join(" · ");
 }

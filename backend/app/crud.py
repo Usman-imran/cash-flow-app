@@ -126,13 +126,19 @@ def delete_transaction(db: Session, txn: models.CashTransaction) -> None:
 
 
 def get_transactions_between(
-    db: Session, start: datetime, end: datetime, limit: int | None = None
+    db: Session,
+    start: datetime,
+    end: datetime,
+    limit: int | None = None,
+    person_id: int | None = None,
 ) -> list[models.CashTransaction]:
     stmt = (
         _transactions_query()
         .where(Txn.transaction_time >= start, Txn.transaction_time < end)
         .order_by(Txn.transaction_time.desc(), Txn.id.desc())
     )
+    if person_id is not None:
+        stmt = stmt.where(Txn.person_id == person_id)
     if limit is not None:
         stmt = stmt.limit(limit)
     return list(db.scalars(stmt))

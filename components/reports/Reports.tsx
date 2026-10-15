@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { AlertCircle, CalendarRange, Download, FileBarChart, Filter, Inbox, Printer, Users } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { AlertCircle, CalendarRange, ChevronRight, Download, FileBarChart, Filter, Inbox, Printer, Users } from "lucide-react";
 import Spinner from "@/components/Spinner";
+import EntryList from "@/components/reports/EntryList";
 import { apiFetch, type DateWiseReport, type SalesmanWiseReport, type TodaySummary } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv";
 import { addDays, daysBetween, startOfMonth, startOfPrevMonth } from "@/lib/dates";
@@ -63,6 +64,11 @@ export default function Reports() {
   const [nonce, setNonce] = useState(0);
   const [hideInactive, setHideInactive] = useState(false);
   const [printedAt, setPrintedAt] = useState<string | null>(null);
+  // Report row showing its individual entries, e.g. "date:2026-10-15" or "salesman:3"
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const toggle = (rowKey: string) => setExpanded((cur) => (cur === rowKey ? null : rowKey));
+  // After an entry is edited or deleted, reload the totals and the open entry list
+  const reload = () => setNonce((n) => n + 1);
 
   // "Today" comes from the backend so ranges follow APP_TIMEZONE; default range is this month
   const init = useCallback((signal?: AbortSignal) => {
@@ -291,6 +297,7 @@ export default function Reports() {
             {applied && applied.start !== applied.end && (
               <span className="text-xs text-slate-400">({daysBetween(applied.start, applied.end) + 1} days)</span>
             )}
+            <span className="text-xs text-slate-400 print:hidden">· Click a row to see, edit or delete its entries</span>
           </div>
           {tab === "salesman" && (
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 print:hidden">
@@ -334,6 +341,17 @@ export default function Reports() {
                   numericFrom={1}
                   rows={dateWise.data.rows.map((r) => ({
                     key: r.date,
+                    expanded: expanded === `date:${r.date}`,
+                    onToggle: () => toggle(`date:${r.date}`),
+                    detail: (
+                      <EntryList
+                        url={`/api/transactions?start_date=${r.date}&end_date=${r.date}`}
+                        nonce={nonce}
+                        showDate={false}
+                        showSalesman
+                        onChanged={reload}
+                      />
+                    ),
                     cells: [
                       <time key="d" dateTime={r.date}>
                         {formatShortDate(r.date)}
@@ -367,6 +385,17 @@ export default function Reports() {
                   rows={salesmanRows.map((r) => ({
                     key: String(r.person_id),
                     muted: r.transaction_count === 0,
+                    expanded: expanded === `salesman:${r.person_id}`,
+                    onToggle: r.transaction_count > 0 ? () => toggle(`salesman:${r.person_id}`) : undefined,
+                    detail: applied && (
+                      <EntryList
+                        url={`/api/transactions?start_date=${applied.start}&end_date=${applied.end}&person_id=${r.person_id}`}
+                        nonce={nonce}
+                        showDate
+                        showSalesman={false}
+                        onChanged={reload}
+                      />
+                    ),
                     cells: [
                       <span
                         key="c"
@@ -444,7 +473,15 @@ function ReportTable({
   numericFrom,
 }: {
   headers: string[];
-  rows: { key: string; cells: ReactNode[]; muted?: boolean }[];
+  rows: {
+    key: string;
+    cells: ReactNode[];
+    muted?: boolean;
+    /** Rows with onToggle can be expanded to show `detail` below them */
+    onToggle?: () => void;
+    expanded?: boolean;
+    detail?: ReactNode;
+  }[];
   footer: ReactNode[];
   /** Columns at or after this index are right-aligned numbers */
   numericFrom: number;
@@ -464,16 +501,49 @@ function ReportTable({
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800 print:divide-slate-200">
           {rows.map((row) => (
-            <tr
-              key={row.key}
-              className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 ${row.muted ? "text-slate-400 dark:text-slate-500" : ""}`}
-            >
-              {row.cells.map((cell, i) => (
-                <td key={i} className={`whitespace-nowrap px-5 py-3 ${align(i)}`}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
+            <Fragment key={row.key}>
+              <tr
+                onClick={row.onToggle}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 ${row.onToggle ? "cursor-pointer" : ""} ${
+                  row.muted ? "text-slate-400 dark:text-slate-500" : ""
+                } ${row.expanded ? "bg-slate-50 dark:bg-slate-800/40" : ""}`}
+              >
+                {row.cells.map((cell, i) => (
+                  <td key={i} className={`whitespace-nowrap px-5 py-3 ${align(i)}`}>
+                    {i === 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        {row.onToggle ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              row.onToggle?.();
+                            }}
+                            aria-expanded={!!row.expanded}
+                            aria-label={row.expanded ? "Hide entries" : "Show entries"}
+                            className="-ml-1.5 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 print:hidden"
+                          >
+                            <ChevronRight className={`h-4 w-4 transition-transform ${row.expanded ? "rotate-90" : ""}`} />
+                          </button>
+                        ) : (
+                          <span className="-ml-1.5 w-5 print:hidden" aria-hidden />
+                        )}
+                        {cell}
+                      </span>
+                    ) : (
+                      cell
+                    )}
+                  </td>
+                ))}
+              </tr>
+              {row.expanded && row.detail && (
+                <tr className="print:hidden">
+                  <td colSpan={headers.length} className="p-0">
+                    {row.detail}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
         <tfoot className="border-t-2 border-slate-200 bg-emerald-50/60 font-semibold dark:border-slate-700 dark:bg-emerald-500/5 print:bg-slate-100">

@@ -7,19 +7,12 @@ import Spinner from "@/components/Spinner";
 import { useToast } from "@/components/Toast";
 import DeleteEntryDialog from "@/components/daily-log/DeleteEntryDialog";
 import EditEntryModal from "@/components/daily-log/EditEntryModal";
-import { apiFetch, DENOMINATIONS, type NoteCounts, type Transaction } from "@/lib/api";
-import { formatCurrency, formatExactTime, formatLongDate, formatTime } from "@/lib/format";
+import { apiFetch, type Transaction } from "@/lib/api";
+import { formatCurrency, formatExactTime, formatLongDate, formatTime, noteBreakdown } from "@/lib/format";
 
 /** Lowercase and drop separators so "sm0001", "SM-0001" and "sm 0001" all match. */
 function normalize(value: string) {
   return value.toLowerCase().replace(/[\s-]+/g, "");
-}
-
-/** e.g. "2×5000 · 3×100 · coins 7" */
-function noteBreakdown(counts: NoteCounts) {
-  const parts = DENOMINATIONS.filter((d) => counts[`note_${d}`] > 0).map((d) => `${counts[`note_${d}`]}×${d}`);
-  if (counts.coins > 0) parts.push(`coins ${counts.coins}`);
-  return parts.join(" · ");
 }
 
 function sumAmounts(list: Transaction[]) {

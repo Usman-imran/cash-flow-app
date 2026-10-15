@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from datetime import date
+
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from .. import crud, schemas
 from ..database import DbSession
@@ -18,6 +20,22 @@ def create_transaction(payload: schemas.TransactionCreate, db: DbSession):
     if crud.get_person(db, payload.person_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Salesman not found")
     return crud.create_transaction(db, payload)
+
+
+@router.get("", response_model=list[schemas.TransactionRead])
+def list_transactions(
+    db: DbSession,
+    start_date: date = Query(..., description="YYYY-MM-DD, inclusive"),
+    end_date: date = Query(..., description="YYYY-MM-DD, inclusive"),
+    person_id: int | None = Query(None, gt=0),
+):
+    if start_date > end_date:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="start_date must be on or before end_date"
+        )
+    return crud.get_transactions_between(
+        db, *crud.day_bounds(start_date, end_date), person_id=person_id
+    )
 
 
 @router.get("/today", response_model=list[schemas.TransactionRead])
