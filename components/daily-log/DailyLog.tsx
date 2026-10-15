@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertCircle, CalendarDays, Inbox, Pencil, PlusCircle, RefreshCw, Search, SearchX, X } from "lucide-react";
+import { AlertCircle, CalendarDays, Inbox, Pencil, PlusCircle, RefreshCw, Search, SearchX, Trash2, X } from "lucide-react";
 import Spinner from "@/components/Spinner";
 import { useToast } from "@/components/Toast";
+import DeleteEntryDialog from "@/components/daily-log/DeleteEntryDialog";
 import EditEntryModal from "@/components/daily-log/EditEntryModal";
 import { apiFetch, DENOMINATIONS, type NoteCounts, type Transaction } from "@/lib/api";
 import { formatCurrency, formatExactTime, formatLongDate, formatTime } from "@/lib/format";
@@ -32,7 +33,7 @@ export default function DailyLog() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "edit" | "delete"; entry: Transaction } | null>(null);
   const inFlight = useRef<AbortController | null>(null);
 
   const load = useCallback(() => {
@@ -75,7 +76,7 @@ export default function DailyLog() {
   };
 
   const handleSaved = (updated: Transaction) => {
-    setEditing(null);
+    setDialog(null);
     toast({
       title: "Entry updated",
       description: `${formatCurrency(updated.amount)} from ${updated.person.name}.`,
@@ -83,6 +84,15 @@ export default function DailyLog() {
     // Refetch: the time may have moved the entry to another day or position
     setRefreshing(true);
     load();
+  };
+
+  const handleDeleted = (deleted: Transaction) => {
+    setDialog(null);
+    setEntries((list) => list && list.filter((t) => t.id !== deleted.id));
+    toast({
+      title: "Entry deleted",
+      description: `${formatCurrency(deleted.amount)} from ${deleted.person.name} was removed.`,
+    });
   };
 
   const filtered = useMemo(() => {
@@ -266,15 +276,26 @@ export default function DailyLog() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-5 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setEditing(t)}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                        aria-label={`Edit entry from ${t.person.name} at ${formatExactTime(t.transaction_time)}`}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden />
-                        <span className="hidden sm:inline">Edit</span>
-                      </button>
+                      <div className="inline-flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDialog({ kind: "edit", entry: t })}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                          aria-label={`Edit entry from ${t.person.name} at ${formatExactTime(t.transaction_time)}`}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                          <span className="hidden sm:inline">Edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDialog({ kind: "delete", entry: t })}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                          aria-label={`Delete entry from ${t.person.name} at ${formatExactTime(t.transaction_time)}`}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -297,7 +318,12 @@ export default function DailyLog() {
         )}
       </section>
 
-      {editing && <EditEntryModal entry={editing} onClose={() => setEditing(null)} onSaved={handleSaved} />}
+      {dialog?.kind === "edit" && (
+        <EditEntryModal entry={dialog.entry} onClose={() => setDialog(null)} onSaved={handleSaved} />
+      )}
+      {dialog?.kind === "delete" && (
+        <DeleteEntryDialog entry={dialog.entry} onClose={() => setDialog(null)} onDeleted={handleDeleted} />
+      )}
     </div>
   );
 }

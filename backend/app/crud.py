@@ -120,6 +120,11 @@ def update_transaction(
     return get_transaction(db, txn.id)
 
 
+def delete_transaction(db: Session, txn: models.CashTransaction) -> None:
+    db.delete(txn)  # its note breakdown goes with it
+    db.commit()
+
+
 def get_transactions_between(
     db: Session, start: datetime, end: datetime, limit: int | None = None
 ) -> list[models.CashTransaction]:
