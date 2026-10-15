@@ -84,6 +84,10 @@ class TransactionCreate(BaseModel):
         return self
 
 
+class TransactionUpdate(TransactionCreate):
+    pass
+
+
 class TransactionRead(ORMModel):
     id: int
     person_id: int

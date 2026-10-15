@@ -73,10 +73,12 @@ def _transactions_query():
     return select(Txn).options(joinedload(Txn.person))
 
 
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=APP_TIMEZONE)
+
+
 def create_transaction(db: Session, data: schemas.TransactionCreate) -> models.CashTransaction:
-    txn_time = data.transaction_time or now_local()
-    if txn_time.tzinfo is None:
-        txn_time = txn_time.replace(tzinfo=APP_TIMEZONE)
+    txn_time = _aware(data.transaction_time or now_local())
 
     txn = Txn(
         person_id=data.person_id,
@@ -88,7 +90,34 @@ def create_transaction(db: Session, data: schemas.TransactionCreate) -> models.C
         txn.denomination = models.TransactionDenomination(**data.denomination.model_dump())
     db.add(txn)
     db.commit()
-    return db.scalars(_transactions_query().where(Txn.id == txn.id)).one()
+    return get_transaction(db, txn.id)
+
+
+def get_transaction(db: Session, txn_id: int) -> models.CashTransaction | None:
+    return db.scalars(_transactions_query().where(Txn.id == txn_id)).one_or_none()
+
+
+def update_transaction(
+    db: Session, txn: models.CashTransaction, data: schemas.TransactionUpdate
+) -> models.CashTransaction:
+    txn.person_id = data.person_id
+    txn.amount = data.amount
+    txn.notes = data.notes or None
+    if data.transaction_time is not None:  # omitted -> keep the original time
+        txn.transaction_time = _aware(data.transaction_time)
+
+    if data.denomination is None:
+        txn.denomination = None
+    elif txn.denomination is None:
+        txn.denomination = models.TransactionDenomination(**data.denomination.model_dump())
+    else:
+        # Update in place; replacing the row would clash on its primary key
+        for field, value in data.denomination.model_dump().items():
+            setattr(txn.denomination, field, value)
+
+    db.commit()
+    db.expire(txn)
+    return get_transaction(db, txn.id)
 
 
 def get_transactions_between(

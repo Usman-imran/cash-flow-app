@@ -16,3 +16,13 @@ def create_transaction(payload: schemas.TransactionCreate, db: DbSession):
 @router.get("/today", response_model=list[schemas.TransactionRead])
 def list_today_transactions(db: DbSession):
     return crud.get_today_transactions(db)
+
+
+@router.put("/{txn_id}", response_model=schemas.TransactionRead)
+def update_transaction(txn_id: int, payload: schemas.TransactionUpdate, db: DbSession):
+    txn = crud.get_transaction(db, txn_id)
+    if txn is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    if crud.get_person(db, payload.person_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Salesman not found")
+    return crud.update_transaction(db, txn, payload)

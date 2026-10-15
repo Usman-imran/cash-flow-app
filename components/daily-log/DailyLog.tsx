@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { AlertCircle, CalendarDays, Inbox, PlusCircle, RefreshCw, Search, SearchX, X } from "lucide-react";
+import { AlertCircle, CalendarDays, Inbox, Pencil, PlusCircle, RefreshCw, Search, SearchX, X } from "lucide-react";
 import Spinner from "@/components/Spinner";
+import { useToast } from "@/components/Toast";
+import EditEntryModal from "@/components/daily-log/EditEntryModal";
 import { apiFetch, DENOMINATIONS, type NoteCounts, type Transaction } from "@/lib/api";
 import { formatCurrency, formatExactTime, formatLongDate, formatTime } from "@/lib/format";
 
@@ -24,11 +26,13 @@ function sumAmounts(list: Transaction[]) {
 }
 
 export default function DailyLog() {
+  const toast = useToast();
   const [entries, setEntries] = useState<Transaction[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const inFlight = useRef<AbortController | null>(null);
 
   const load = useCallback(() => {
@@ -66,6 +70,17 @@ export default function DailyLog() {
   }, [load]);
 
   const refresh = () => {
+    setRefreshing(true);
+    load();
+  };
+
+  const handleSaved = (updated: Transaction) => {
+    setEditing(null);
+    toast({
+      title: "Entry updated",
+      description: `${formatCurrency(updated.amount)} from ${updated.person.name}.`,
+    });
+    // Refetch: the time may have moved the entry to another day or position
     setRefreshing(true);
     load();
   };
@@ -216,6 +231,9 @@ export default function DailyLog() {
                   <th scope="col" className="whitespace-nowrap px-5 py-3">Salesman Name</th>
                   <th scope="col" className="whitespace-nowrap px-5 py-3 text-right">Amount</th>
                   <th scope="col" className="px-5 py-3">Notes</th>
+                  <th scope="col" className="px-5 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -247,6 +265,17 @@ export default function DailyLog() {
                         <span className="text-slate-300 dark:text-slate-600">—</span>
                       )}
                     </td>
+                    <td className="whitespace-nowrap px-5 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditing(t)}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                        aria-label={`Edit entry from ${t.person.name} at ${formatExactTime(t.transaction_time)}`}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        <span className="hidden sm:inline">Edit</span>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -260,13 +289,15 @@ export default function DailyLog() {
                   <td className="whitespace-nowrap px-5 py-3 text-right font-semibold tabular-nums">
                     {formatCurrency(filteredTotal)}
                   </td>
-                  <td />
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
       </section>
+
+      {editing && <EditEntryModal entry={editing} onClose={() => setEditing(null)} onSaved={handleSaved} />}
     </div>
   );
 }
